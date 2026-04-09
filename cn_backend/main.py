@@ -11,6 +11,8 @@ from auth import create_access_token, verify_password, get_password_hash, SECRET
 import models
 import asyncio
 from contextlib import asynccontextmanager
+from config import AUTO_EXPIRE_INTERVAL
+from routes.admin import router as admin_router
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -30,10 +32,10 @@ async def lifespan(app: FastAPI):
         pass
 
 async def background_auto_expire_task():
-    """Run auto-expire task every 30 seconds"""
+    """Run auto-expire task in periodic intervals"""
     while True:
         try:
-            await asyncio.sleep(30)  # Check every 30 seconds
+            await asyncio.sleep(AUTO_EXPIRE_INTERVAL)
             db = next(get_db())
             expired_count = crud.auto_expire_old_notifications(db)
             if expired_count > 0:
@@ -44,6 +46,7 @@ async def background_auto_expire_task():
 
 # Update FastAPI app initialization
 app = FastAPI(title="NFC Bus Backend", lifespan=lifespan)
+app.include_router(admin_router)
 
 def get_current_user_id(token: str = Depends(oauth2_scheme)):
     try:
@@ -305,6 +308,10 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     if not user:
         user = db.query(models.BusDriver).filter(models.BusDriver.email == form_data.username).first()
         actual_role = "driver"
+
+    if not user:
+        user = crud.get_admin_by_email(db, form_data.username)
+        actual_role = "admin"
     
     if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(

@@ -35,9 +35,47 @@ class BusDriver(BusDriverBase):
     class Config:
         from_attributes = True
 
+
+class AdminBase(BaseModel):
+    name: str
+    email: str
+
+
+class AdminCreate(AdminBase):
+    password: str
+
+
+class Admin(AdminBase):
+    id: UUID
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class BusBase(BaseModel):
+    bus_number: str
+    route_name: Optional[str] = None
+    capacity: Optional[int] = None
+
+
+class BusCreate(BusBase):
+    pass
+
+
+class Bus(BusBase):
+    id: UUID
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
 class TripBase(BaseModel):
     driver_id: UUID
     name: Optional[str] = "Trip"
+    bus_id: Optional[UUID] = None
 
 class TripCreate(TripBase):
     pass
@@ -94,3 +132,27 @@ class PendingNotification(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+class LabelValuePoint(BaseModel):
+    label: str
+    value: float
+
+
+class TimeSeriesPoint(BaseModel):
+    timestamp: str
+    value: float
+
+
+class DashboardSummary(BaseModel):
+    totals: dict
+    revenue_time_series: List[TimeSeriesPoint]
+    top_drivers: List[LabelValuePoint]
+    top_buses: List[LabelValuePoint]
+
+
+class AnalyticsResponse(BaseModel):
+    labels: List[str]
+    values: List[float]
+    datasets: Optional[List[dict]] = None
+    points: Optional[List[dict]] = None

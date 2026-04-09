@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
 import models
-from schemas import StudentCreate, BusDriverCreate, TripCreate, TripDetailCreate
+from schemas import StudentCreate, BusDriverCreate, TripCreate, TripDetailCreate, AdminCreate, BusCreate
 from datetime import datetime, timedelta
-from config import BASE_FARE
+from config import BASE_FARE, TAP_NOTIFICATION_EXPIRY_DURATION
 from auth import get_password_hash, verify_password
 import fcm_service
 
@@ -112,6 +112,48 @@ def get_pending_notifications_for_student(db: Session, student_id: str):
         models.PendingTapNotification.status.in_(["pending", "expired"])
     ).order_by(models.PendingTapNotification.created_at.desc()).all()
 
+
+# ------------------- Admin -------------------
+def create_admin(db: Session, admin: AdminCreate):
+    db_admin = models.Admin(
+        name=admin.name,
+        email=admin.email,
+        password_hash=get_password_hash(admin.password),
+    )
+    db.add(db_admin)
+    db.commit()
+    db.refresh(db_admin)
+    return db_admin
+
+
+def get_admin_by_email(db: Session, email: str):
+    return db.query(models.Admin).filter(models.Admin.email == email).first()
+
+
+def get_admin_by_id(db: Session, admin_id: str):
+    return db.query(models.Admin).filter(models.Admin.id == admin_id).first()
+
+
+# ------------------- Buses -------------------
+def create_bus(db: Session, bus: BusCreate):
+    db_bus = models.Bus(
+        bus_number=bus.bus_number,
+        route_name=bus.route_name,
+        capacity=bus.capacity,
+    )
+    db.add(db_bus)
+    db.commit()
+    db.refresh(db_bus)
+    return db_bus
+
+
+def get_bus_by_id(db: Session, bus_id: str):
+    return db.query(models.Bus).filter(models.Bus.id == bus_id).first()
+
+
+def list_buses(db: Session):
+    return db.query(models.Bus).order_by(models.Bus.bus_number.asc()).all()
+
 # ------------------- Bus Drivers -------------------
 def create_driver(db: Session, driver: BusDriverCreate):
     db_driver = models.BusDriver(
@@ -138,6 +180,7 @@ def delete_driver(db: Session, driver_id):
 def create_trip(db: Session, trip: TripCreate):
     db_trip = models.Trip(
         driver_id=trip.driver_id,
+        bus_id=trip.bus_id,
         name=trip.name,
         total_students=0,
         total_revenue=0.0
@@ -237,15 +280,12 @@ def add_trip_detail_with_notification(db: Session, trip_detail: TripDetailCreate
     db.commit()
     db.refresh(db_trip_detail)
     
-    # TIMEOUT: 2 minutes - EASILY CHANGEABLE HERE
-    NOTIFICATION_TIMEOUT_MINUTES = 2
-    
     pending_notification = models.PendingTapNotification(
         trip_detail_id=db_trip_detail.id,
         nfc_id=trip_detail.nfc_id,
         student_id=student.id,
         trip_id=trip_detail.trip_id,
-        expires_at=datetime.utcnow() + timedelta(minutes=NOTIFICATION_TIMEOUT_MINUTES)
+        expires_at=datetime.utcnow() + timedelta(seconds=TAP_NOTIFICATION_EXPIRY_DURATION)
     )
     db.add(pending_notification)
     db.commit()
