@@ -1,9 +1,7 @@
 import 'local_storage.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-
-const String baseUrl = "http://my-alb-161790312.eu-north-1.elb.amazonaws.com";
-//const String baseUrl = "http://nfc-backend-alb-2091568133.ap-south-2.elb.amazonaws.com";
+import '../config/app_config.dart';
 
 class ApiService {
   static String? _accessToken;
@@ -19,7 +17,7 @@ class ApiService {
     final endpoint = isDriver ? '/drivers/me/fcm_token' : '/students/me/fcm_token';
     
     final res = await http.patch(
-      Uri.parse('$baseUrl$endpoint'),
+      Uri.parse('${AppConfig.baseUrl}$endpoint'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $_accessToken',
@@ -38,7 +36,7 @@ class ApiService {
     await _ensureToken();
     
     final res = await http.post(
-      Uri.parse('$baseUrl/students/me/tap_notifications/$notificationId/respond'),
+      Uri.parse('${AppConfig.baseUrl}/students/me/tap_notifications/$notificationId/respond'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $_accessToken',
@@ -61,7 +59,7 @@ class ApiService {
     await _ensureToken();
     
     final res = await http.get(
-      Uri.parse('$baseUrl/students/me/pending_notifications'),
+      Uri.parse('${AppConfig.baseUrl}/students/me/pending_notifications'),
       headers: {'Authorization': 'Bearer $_accessToken'},
     );
 
@@ -77,7 +75,7 @@ class ApiService {
     await _ensureToken();
     
     final res = await http.post(
-      Uri.parse('$baseUrl/students/me/notifications/$notificationId/dismiss'),
+      Uri.parse('${AppConfig.baseUrl}/students/me/notifications/$notificationId/dismiss'),
       headers: {'Authorization': 'Bearer $_accessToken'},
     );
 
@@ -89,7 +87,7 @@ class ApiService {
     await _ensureToken();
     
     final res = await http.patch(
-      Uri.parse('$baseUrl/students/me/block_nfc'),
+      Uri.parse('${AppConfig.baseUrl}/students/me/block_nfc'),
       headers: {'Authorization': 'Bearer $_accessToken'},
     );
 
@@ -100,7 +98,7 @@ class ApiService {
   // FIXED: Added role validation
   static Future<bool> login(String email, String password, String expectedRole) async {
     final res = await http.post(
-      Uri.parse('$baseUrl/token'),
+      Uri.parse('${AppConfig.baseUrl}/token'),
       headers: {'Content-Type': 'application/x-www-form-urlencoded'},
       body: {'username': email, 'password': password},
     );
@@ -132,7 +130,7 @@ class ApiService {
 
   static Future<bool> signupStudent(String name, String email, String password) async {
     final res = await http.post(
-      Uri.parse('$baseUrl/students'),
+      Uri.parse('${AppConfig.baseUrl}/students'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'name': name, 'email': email, 'password': password}),
     );
@@ -141,7 +139,7 @@ class ApiService {
 
   static Future<bool> signupDriver(String name, String email, String password) async {
     final res = await http.post(
-      Uri.parse('$baseUrl/drivers'),
+      Uri.parse('${AppConfig.baseUrl}/drivers'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'name': name, 'email': email, 'password': password}),
     );
@@ -161,7 +159,7 @@ class ApiService {
 
   static Future<List<Map<String, dynamic>>> getStudentTrips() async {
     final headers = await getAuthHeaders();
-    final res = await http.get(Uri.parse('$baseUrl/students/me/trips'), headers: headers);
+    final res = await http.get(Uri.parse('${AppConfig.baseUrl}/students/me/trips'), headers: headers);
     if (res.statusCode == 200) {
       final data = json.decode(res.body);
       return List<Map<String, dynamic>>.from(data);
@@ -172,7 +170,7 @@ class ApiService {
   static Future<bool> registerNfcCard(String nfcUid) async {
     final headers = await getAuthHeaders();
     final res = await http.patch(
-      Uri.parse('$baseUrl/students/me/nfc'),
+      Uri.parse('${AppConfig.baseUrl}/students/me/nfc'),
       headers: headers,
       body: jsonEncode({'nfc_id': nfcUid}),
     );
@@ -188,7 +186,7 @@ class ApiService {
   static Future<bool> blockNfcCard() async {
     final headers = await getAuthHeaders();
     final res = await http.patch(
-      Uri.parse('$baseUrl/students/me/block_nfc'),
+      Uri.parse('${AppConfig.baseUrl}/students/me/block_nfc'),
       headers: headers,
       body: jsonEncode({'nfc_id': null}),
     );
@@ -197,7 +195,7 @@ class ApiService {
 
   static Future<Map<String, dynamic>> getStudentProfile() async {
     final headers = await getAuthHeaders();
-    final res = await http.get(Uri.parse('$baseUrl/students/me'), headers: headers);
+    final res = await http.get(Uri.parse('${AppConfig.baseUrl}/students/me'), headers: headers);
     if (res.statusCode == 200) {
       return json.decode(res.body);
     }
@@ -208,7 +206,7 @@ class ApiService {
 
   static Future<List<Map<String, dynamic>>> getDriverTrips() async {
     final headers = await getAuthHeaders();
-    final res = await http.get(Uri.parse('$baseUrl/drivers/me/trips'), headers: headers);
+    final res = await http.get(Uri.parse('${AppConfig.baseUrl}/drivers/me/trips'), headers: headers);
     if (res.statusCode == 200) {
       final data = json.decode(res.body);
       return List<Map<String, dynamic>>.from(data);
@@ -218,7 +216,7 @@ class ApiService {
 
   static Future<Map<String, dynamic>> getDriverProfile() async {
     final headers = await getAuthHeaders();
-    final res = await http.get(Uri.parse('$baseUrl/drivers/me'), headers: headers);
+    final res = await http.get(Uri.parse('${AppConfig.baseUrl}/drivers/me'), headers: headers);
     if (res.statusCode == 200) {
       return json.decode(res.body);
     }
@@ -229,7 +227,7 @@ class ApiService {
   static Future<Map<String, dynamic>> createAndStartActiveTrip(String tripName) async {
     final headers = await getAuthHeaders();
     final res = await http.post(
-      Uri.parse('$baseUrl/drivers/me/trips/active'),
+      Uri.parse('${AppConfig.baseUrl}/drivers/me/trips/active'),
       headers: headers,
       body: jsonEncode({'name': tripName}),
     );
@@ -242,7 +240,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getActiveTrip() async {
     final headers = await getAuthHeaders();
     final res = await http.get(
-      Uri.parse('$baseUrl/drivers/me/trips/active'),
+      Uri.parse('${AppConfig.baseUrl}/drivers/me/trips/active'),
       headers: headers,
     );
     if (res.statusCode == 200) {
@@ -254,7 +252,7 @@ class ApiService {
   static Future<Map<String, dynamic>> endActiveTrip() async {
     final headers = await getAuthHeaders();
     final res = await http.patch(
-      Uri.parse('$baseUrl/drivers/me/trips/active/end'),
+      Uri.parse('${AppConfig.baseUrl}/drivers/me/trips/active/end'),
       headers: headers,
     );
     if (res.statusCode == 200) {
@@ -266,7 +264,7 @@ class ApiService {
   static Future<Map<String, dynamic>> tapNfcInActiveTrip(String nfcId) async {
     final headers = await getAuthHeaders();
     final res = await http.post(
-      Uri.parse('$baseUrl/drivers/me/trips/active/tap'),
+      Uri.parse('${AppConfig.baseUrl}/drivers/me/trips/active/tap'),
       headers: headers,
       body: jsonEncode({'nfc_id': nfcId}),
     );
@@ -280,7 +278,7 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> getTripDetails(String tripId) async {
     final headers = await getAuthHeaders();
     final res = await http.get(
-      Uri.parse('$baseUrl/drivers/me/trips/$tripId/details'),
+      Uri.parse('${AppConfig.baseUrl}/drivers/me/trips/$tripId/details'),
       headers: headers,
     );
     if (res.statusCode == 200) {
