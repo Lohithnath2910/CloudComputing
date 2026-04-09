@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!--
+      Allow cleartext traffic for local development (IPs) and the production
+      backend domain. The base-config with cleartextTrafficPermitted="true"
+      enables HTTP to IP addresses such as 172.16.x.x used by devices on the
+      same LAN.
+    -->
+    <base-config cleartextTrafficPermitted="true" />
+
+    <!-- Keep the explicit domain rule for the AWS backend as well -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">nfc-backend-alb-2091568133.ap-south-2.elb.amazonaws.com</domain>
+    </domain-config>
+</network-security-config>

@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+pydantic
+sqlalchemy-cockroachdb
+bcrypt==4.0.1
+passlib==1.7.4
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+firebase-admin
+python-dotenv

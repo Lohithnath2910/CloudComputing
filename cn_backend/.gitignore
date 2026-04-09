@@ -1,0 +1,35 @@
+# Ignore virtual environments
+venv/
+
+# Ignore Python cache files
+__pycache__/
+*.py[cod]
+
+# Ignore IDE settings
+.idea/
+.vscode/
+
+# Ignore log files
+*.log
+
+# Ignore environment files
+.env
+.env.*
+
+# Ignore compiled files
+*.so
+
+# Ignore Firebase credentials
+firebase-service-account.json
+*.json
+*.dll
+*.dylib
+
+# Ignore test reports
+.coverage
+*.cover
+*.py,cover
+
+# Ignore database files
+*.sqlite3
+*.db
