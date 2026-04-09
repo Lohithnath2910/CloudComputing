@@ -20,6 +20,10 @@ def send_tap_notification(fcm_token: str, nfc_id: str, notification_id: str, stu
         title = "NFC Card Tapped"
         body = "Your card was scanned on a bus. Accept or Deny this payment?"
         message = messaging.Message(
+            notification=messaging.Notification(
+                title=title,
+                body=body,
+            ),
             data={
                 "type": "nfc_tap",
                 "notification_id": notification_id,
@@ -31,13 +35,23 @@ def send_tap_notification(fcm_token: str, nfc_id: str, notification_id: str, stu
             },
             token=fcm_token,
             android=messaging.AndroidConfig(
-                priority='high'
+                priority='high',
+                ttl=120,
+                notification=messaging.AndroidNotification(
+                    title=title,
+                    body=body,
+                    channel_id="nfc_taps",
+                    priority="max",
+                    sound="default",
+                ),
             ),
             apns=messaging.APNSConfig(
                 headers={"apns-priority": "10"},
                 payload=messaging.APNSPayload(
                     aps=messaging.Aps(
-                        content_available=True
+                        alert=messaging.ApsAlert(title=title, body=body),
+                        sound="default",
+                        content_available=True,
                     )
                 )
             )
@@ -56,6 +70,10 @@ def send_blocked_nfc_alert(fcm_token: str):
         title = "Blocked NFC Used"
         body = "Your blocked NFC card was used. Take action immediately!"
         message = messaging.Message(
+            notification=messaging.Notification(
+                title=title,
+                body=body,
+            ),
             data={
                 "type": "blocked_nfc_alert",
                 "action_required": "true",
@@ -63,10 +81,25 @@ def send_blocked_nfc_alert(fcm_token: str):
                 "body": body,
             },
             token=fcm_token,
-            android=messaging.AndroidConfig(priority='high'),
+            android=messaging.AndroidConfig(
+                priority='high',
+                notification=messaging.AndroidNotification(
+                    title=title,
+                    body=body,
+                    channel_id="nfc_taps",
+                    priority="high",
+                    sound="default",
+                ),
+            ),
             apns=messaging.APNSConfig(
                 headers={"apns-priority": "10"},
-                payload=messaging.APNSPayload(aps=messaging.Aps(content_available=True)),
+                payload=messaging.APNSPayload(
+                    aps=messaging.Aps(
+                        alert=messaging.ApsAlert(title=title, body=body),
+                        sound="default",
+                        content_available=True,
+                    )
+                ),
             ),
         )
         
@@ -82,6 +115,10 @@ def send_expired_notification_alert(fcm_token: str, nfc_id: str):
         title = "NFC Payment Auto-Accepted"
         body = "Your NFC was used but you did not respond in time. Payment was auto-accepted."
         message = messaging.Message(
+            notification=messaging.Notification(
+                title=title,
+                body=body,
+            ),
             data={
                 "type": "expired_notification",
                 "nfc_id": nfc_id,
@@ -90,10 +127,25 @@ def send_expired_notification_alert(fcm_token: str, nfc_id: str):
                 "body": body,
             },
             token=fcm_token,
-            android=messaging.AndroidConfig(priority='high'),
+            android=messaging.AndroidConfig(
+                priority='high',
+                notification=messaging.AndroidNotification(
+                    title=title,
+                    body=body,
+                    channel_id="nfc_taps",
+                    priority="high",
+                    sound="default",
+                ),
+            ),
             apns=messaging.APNSConfig(
                 headers={"apns-priority": "10"},
-                payload=messaging.APNSPayload(aps=messaging.Aps(content_available=True)),
+                payload=messaging.APNSPayload(
+                    aps=messaging.Aps(
+                        alert=messaging.ApsAlert(title=title, body=body),
+                        sound="default",
+                        content_available=True,
+                    )
+                ),
             ),
         )
         

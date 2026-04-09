@@ -38,27 +38,29 @@ class NotificationHandler {
         _showBlockedAlert();
       }
 
-      // Show local notification even for data-only payloads.
-      final fallbackTitle = type == 'nfc_tap'
-          ? 'NFC Card Tapped'
-          : type == 'expired_notification'
-              ? 'Payment Auto-Accepted'
-              : type == 'blocked_nfc_alert'
-                  ? 'Blocked NFC Used'
-                  : 'Notification';
-      final fallbackBody = type == 'nfc_tap'
-          ? 'Please review this trip tap request.'
-          : type == 'expired_notification'
-              ? 'A tap request expired and was auto-accepted.'
-              : type == 'blocked_nfc_alert'
-                  ? 'Blocked NFC card usage detected.'
-                  : 'Open app to view details.';
+      // Avoid duplicates: show local notification only for data-only payloads.
+      if (message.notification == null) {
+        final fallbackTitle = type == 'nfc_tap'
+            ? 'NFC Card Tapped'
+            : type == 'expired_notification'
+                ? 'Payment Auto-Accepted'
+                : type == 'blocked_nfc_alert'
+                    ? 'Blocked NFC Used'
+                    : 'Notification';
+        final fallbackBody = type == 'nfc_tap'
+            ? 'Please review this trip tap request.'
+            : type == 'expired_notification'
+                ? 'A tap request expired and was auto-accepted.'
+                : type == 'blocked_nfc_alert'
+                    ? 'Blocked NFC card usage detected.'
+                    : 'Open app to view details.';
 
-      FcmService.showLocalNotification(
-        title: message.notification?.title ?? fallbackTitle,
-        body: message.notification?.body ?? fallbackBody,
-        payload: message.data.toString(),
-      );
+        FcmService.showLocalNotification(
+          title: fallbackTitle,
+          body: fallbackBody,
+          payload: message.data.toString(),
+        );
+      }
     });
 
     // Handle background/terminated messages

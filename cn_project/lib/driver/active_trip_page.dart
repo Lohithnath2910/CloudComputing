@@ -16,7 +16,6 @@ class _ActiveTripPageState extends State<ActiveTripPage> {
   List<Map<String, dynamic>> scannedStudents = [];
   bool isScanning = false;
   int totalRevenue = 0;
-  static const int baseFare = 20;
   Timer? _refreshTimer;
 
   @override

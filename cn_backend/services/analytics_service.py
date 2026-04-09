@@ -22,15 +22,30 @@ def _to_label_values(rows, label_key, value_key):
     }
 
 
-def get_dashboard(db: Session):
-    totals = analytics_repository.get_dashboard_totals(db)
-
-    revenue_rows = analytics_repository.get_revenue_time_series(db)
-    revenue_points = [
+def _to_time_points(rows):
+    return [
         {"timestamp": row.bucket.isoformat(), "value": float(row.value or 0.0)}
-        for row in revenue_rows
+        for row in rows
         if row.bucket is not None
     ]
+
+
+def _get_adaptive_revenue_series(db: Session):
+    # Prefer daily buckets for long-term trend, but if data sits in a single day
+    # fall back to hourly buckets so the chart remains useful.
+    daily_points = _to_time_points(analytics_repository.get_revenue_time_series(db))
+    if len(daily_points) > 1:
+        return daily_points
+
+    hourly_points = _to_time_points(analytics_repository.get_revenue_time_series_hourly(db))
+    if len(hourly_points) > len(daily_points):
+        return hourly_points
+    return daily_points
+
+
+def get_dashboard(db: Session):
+    totals = analytics_repository.get_dashboard_totals(db)
+    revenue_points = _get_adaptive_revenue_series(db)
 
     top_driver_rows = analytics_repository.get_revenue_per_driver(db)[:5]
     top_bus_rows = analytics_repository.get_revenue_per_bus(db)[:5]
@@ -50,13 +65,7 @@ def get_dashboard(db: Session):
 def get_revenue(db: Session):
     per_driver = _to_label_values(analytics_repository.get_revenue_per_driver(db), "name", "revenue")
     per_bus = _to_label_values(analytics_repository.get_revenue_per_bus(db), "bus_number", "revenue")
-
-    time_rows = analytics_repository.get_revenue_time_series(db)
-    time_points = [
-        {"timestamp": row.bucket.isoformat(), "value": float(row.value or 0.0)}
-        for row in time_rows
-        if row.bucket is not None
-    ]
+    time_points = _get_adaptive_revenue_series(db)
 
     return {
         "driver": per_driver,

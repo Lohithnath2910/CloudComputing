@@ -160,6 +160,36 @@ class PendingNotification(BaseModel):
         from_attributes = True
 
 
+class StudentTripSummary(BaseModel):
+    id: UUID
+    driver_id: UUID
+    bus_id: Optional[UUID] = None
+    name: str
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    total_students: int
+    total_revenue: float
+    created_at: datetime
+    bus_number: Optional[str] = None
+    bus_route_name: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_email: Optional[str] = None
+
+
+class StudentTripTapRecord(BaseModel):
+    id: UUID
+    timestamp: datetime
+    status: str
+    fare_paid: float
+
+
+class StudentTripDetailView(BaseModel):
+    trip: StudentTripSummary
+    student_nfc_id: Optional[str] = None
+    tap_count: int
+    tap_records: List[StudentTripTapRecord]
+
+
 class LabelValuePoint(BaseModel):
     label: str
     value: float
@@ -182,3 +212,24 @@ class AnalyticsResponse(BaseModel):
     values: List[float]
     datasets: Optional[List[dict]] = None
     points: Optional[List[dict]] = None
+
+
+class AdminStudentTripAudit(BaseModel):
+    trip_detail_id: UUID
+    nfc_id: str
+    timestamp: datetime
+    status: str
+    fare_paid: float
+    student_id: Optional[UUID] = None
+    student_name: Optional[str] = None
+    student_email: Optional[str] = None
+    trip_id: UUID
+    trip_name: Optional[str] = None
+    trip_start_time: Optional[datetime] = None
+    trip_end_time: Optional[datetime] = None
+    bus_id: Optional[UUID] = None
+    bus_number: Optional[str] = None
+    route_name: Optional[str] = None
+    driver_id: Optional[UUID] = None
+    driver_name: Optional[str] = None
+    driver_email: Optional[str] = None

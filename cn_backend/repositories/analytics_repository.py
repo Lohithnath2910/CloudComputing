@@ -44,6 +44,20 @@ def get_revenue_time_series(db: Session):
     return rows
 
 
+def get_revenue_time_series_hourly(db: Session):
+    local_created_at = func.timezone(IST_TZ, models.Trip.created_at)
+    rows = (
+        db.query(
+            func.date_trunc("hour", local_created_at).label("bucket"),
+            func.coalesce(func.sum(models.Trip.total_revenue), 0.0).label("value"),
+        )
+        .group_by("bucket")
+        .order_by("bucket")
+        .all()
+    )
+    return rows
+
+
 def get_revenue_per_driver(db: Session):
     rows = (
         db.query(

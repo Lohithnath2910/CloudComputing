@@ -113,15 +113,88 @@ def get_student_trips(db: Session, student_id):
     student = db.query(models.Student).filter(models.Student.id == student_id).first()
     if not student or not student.nfc_id:
         return []
-    
+
     trip_details = db.query(models.TripDetail).filter(models.TripDetail.nfc_id == student.nfc_id).all()
     trip_ids = [td.trip_id for td in trip_details]
-    
+
     if not trip_ids:
         return []
-    
+
     trips = db.query(models.Trip).filter(models.Trip.id.in_(trip_ids)).order_by(models.Trip.created_at.desc()).all()
-    return trips
+    summaries = []
+    for trip in trips:
+        bus = trip.bus
+        driver = trip.driver
+        summaries.append({
+            "id": trip.id,
+            "driver_id": trip.driver_id,
+            "bus_id": trip.bus_id,
+            "name": trip.name,
+            "start_time": trip.start_time,
+            "end_time": trip.end_time,
+            "total_students": trip.total_students,
+            "total_revenue": trip.total_revenue,
+            "created_at": trip.created_at,
+            "bus_number": bus.bus_number if bus else None,
+            "bus_route_name": bus.route_name if bus else None,
+            "driver_name": driver.name if driver else None,
+            "driver_email": driver.email if driver else None,
+        })
+    return summaries
+
+
+def get_student_trip_details(db: Session, student_id: str, trip_id: str):
+    student = db.query(models.Student).filter(models.Student.id == student_id).first()
+    if not student or not student.nfc_id:
+        return None
+
+    has_trip_record = db.query(models.TripDetail).filter(
+        models.TripDetail.trip_id == trip_id,
+        models.TripDetail.nfc_id == student.nfc_id,
+    ).first()
+    if not has_trip_record:
+        return None
+
+    trip = db.query(models.Trip).filter(models.Trip.id == trip_id).first()
+    if not trip:
+        return None
+
+    tap_records = db.query(models.TripDetail).filter(
+        models.TripDetail.trip_id == trip_id,
+        models.TripDetail.nfc_id == student.nfc_id,
+    ).order_by(models.TripDetail.timestamp.desc()).all()
+
+    bus = trip.bus
+    driver = trip.driver
+
+    return {
+        "trip": {
+            "id": trip.id,
+            "driver_id": trip.driver_id,
+            "bus_id": trip.bus_id,
+            "name": trip.name,
+            "start_time": trip.start_time,
+            "end_time": trip.end_time,
+            "total_students": trip.total_students,
+            "total_revenue": trip.total_revenue,
+            "created_at": trip.created_at,
+            "bus_number": bus.bus_number if bus else None,
+            "bus_route_name": bus.route_name if bus else None,
+            "driver_name": driver.name if driver else None,
+            "driver_email": driver.email if driver else None,
+        },
+        "student_nfc_id": student.nfc_id,
+        "tap_count": len(tap_records),
+        "tap_records": [
+            {
+                "id": row.id,
+                "timestamp": row.timestamp,
+                "status": row.status,
+                "fare_paid": row.fare_paid,
+            }
+            for row in tap_records
+        ],
+    }
 
 def get_pending_notifications_for_student(db: Session, student_id: str):
     """Get all pending/expired notifications for a student"""
@@ -270,6 +343,29 @@ def resolve_bus_for_new_active_trip(db: Session, driver_id: str, requested_bus_i
         final_bus_id = str(active_assignment.bus_id)
 
     if final_bus_id is None:
+        latest_assignment = (
+            db.query(models.DriverBusAssignment)
+            .filter(models.DriverBusAssignment.driver_id == driver_id)
+            .order_by(models.DriverBusAssignment.start_time.desc())
+            .first()
+        )
+        if latest_assignment:
+            final_bus_id = str(latest_assignment.bus_id)
+
+    if final_bus_id is None:
+        latest_trip_with_bus = (
+            db.query(models.Trip)
+            .filter(
+                models.Trip.driver_id == driver_id,
+                models.Trip.bus_id.isnot(None),
+            )
+            .order_by(models.Trip.created_at.desc())
+            .first()
+        )
+        if latest_trip_with_bus:
+            final_bus_id = str(latest_trip_with_bus.bus_id)
+
+    if final_bus_id is None:
         return None
 
     bus = get_bus_by_id(db, final_bus_id)
@@ -311,6 +407,10 @@ def create_driver(db: Session, driver: BusDriverCreate):
 
 def get_driver_by_id(db: Session, driver_id: str):
     return db.query(models.BusDriver).filter(models.BusDriver.id == driver_id).first()
+
+
+def list_drivers(db: Session):
+    return db.query(models.BusDriver).order_by(models.BusDriver.name.asc()).all()
 
 def delete_driver(db: Session, driver_id):
     driver = db.query(models.BusDriver).filter(models.BusDriver.id == driver_id).first()
@@ -357,6 +457,61 @@ def get_driver_trips(db: Session, driver_id):
 
 def get_trip_details(db: Session, trip_id):
     return db.query(models.TripDetail).filter(models.TripDetail.trip_id == trip_id).all()
+
+
+def get_student_trip_audit_rows(db: Session):
+    rows = (
+        db.query(
+            models.TripDetail.id.label("trip_detail_id"),
+            models.TripDetail.nfc_id,
+            models.TripDetail.timestamp,
+            models.TripDetail.status,
+            models.TripDetail.fare_paid,
+            models.Student.id.label("student_id"),
+            models.Student.name.label("student_name"),
+            models.Student.email.label("student_email"),
+            models.Trip.id.label("trip_id"),
+            models.Trip.name.label("trip_name"),
+            models.Trip.start_time.label("trip_start_time"),
+            models.Trip.end_time.label("trip_end_time"),
+            models.Bus.id.label("bus_id"),
+            models.Bus.bus_number,
+            models.Bus.route_name,
+            models.BusDriver.id.label("driver_id"),
+            models.BusDriver.name.label("driver_name"),
+            models.BusDriver.email.label("driver_email"),
+        )
+        .join(models.Trip, models.Trip.id == models.TripDetail.trip_id)
+        .outerjoin(models.Student, models.Student.nfc_id == models.TripDetail.nfc_id)
+        .outerjoin(models.Bus, models.Bus.id == models.Trip.bus_id)
+        .outerjoin(models.BusDriver, models.BusDriver.id == models.Trip.driver_id)
+        .order_by(models.TripDetail.timestamp.desc())
+        .all()
+    )
+
+    return [
+        {
+            "trip_detail_id": row.trip_detail_id,
+            "nfc_id": row.nfc_id,
+            "timestamp": row.timestamp,
+            "status": row.status,
+            "fare_paid": row.fare_paid,
+            "student_id": row.student_id,
+            "student_name": row.student_name,
+            "student_email": row.student_email,
+            "trip_id": row.trip_id,
+            "trip_name": row.trip_name,
+            "trip_start_time": row.trip_start_time,
+            "trip_end_time": row.trip_end_time,
+            "bus_id": row.bus_id,
+            "bus_number": row.bus_number,
+            "route_name": row.route_name,
+            "driver_id": row.driver_id,
+            "driver_name": row.driver_name,
+            "driver_email": row.driver_email,
+        }
+        for row in rows
+    ]
 
 def get_active_trip_for_driver(db: Session, driver_id: str):
     return db.query(models.Trip).filter(

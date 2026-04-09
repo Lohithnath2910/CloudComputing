@@ -52,6 +52,11 @@ def list_buses(db: Session = Depends(get_db), _: str = Depends(get_current_admin
     return crud.list_buses(db)
 
 
+@router.get("/drivers", response_model=list[schemas.BusDriver])
+def list_drivers(db: Session = Depends(get_db), _: str = Depends(get_current_admin_id)):
+    return crud.list_drivers(db)
+
+
 @router.post("/buses", response_model=schemas.Bus)
 def create_bus(bus: schemas.BusCreate, db: Session = Depends(get_db), _: str = Depends(get_current_admin_id)):
     return crud.create_bus(db, bus)
@@ -97,3 +102,8 @@ def driver_performance(db: Session = Depends(get_db), _: str = Depends(get_curre
 @router.get("/students/stats")
 def student_stats(db: Session = Depends(get_db), _: str = Depends(get_current_admin_id)):
     return analytics_service.get_student_stats(db)
+
+
+@router.get("/students/trip-audit", response_model=list[schemas.AdminStudentTripAudit])
+def student_trip_audit(db: Session = Depends(get_db), _: str = Depends(get_current_admin_id)):
+    return crud.get_student_trip_audit_rows(db)

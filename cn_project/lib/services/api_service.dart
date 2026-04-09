@@ -5,6 +5,9 @@ import '../config/app_config.dart';
 
 class ApiService {
   static String? _accessToken;
+  static const Map<String, String> _ngrokBypassHeader = {
+    'ngrok-skip-browser-warning': 'true',
+  };
 
   static Future<void> _ensureToken() async {
     _accessToken ??= await LocalStorage.getToken();
@@ -19,6 +22,7 @@ class ApiService {
     final res = await http.patch(
       Uri.parse('${AppConfig.baseUrl}$endpoint'),
       headers: {
+        ..._ngrokBypassHeader,
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $_accessToken',
       },
@@ -38,6 +42,7 @@ class ApiService {
     final res = await http.post(
       Uri.parse('${AppConfig.baseUrl}/students/me/tap_notifications/$notificationId/respond'),
       headers: {
+        ..._ngrokBypassHeader,
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $_accessToken',
       },
@@ -60,7 +65,10 @@ class ApiService {
     
     final res = await http.get(
       Uri.parse('${AppConfig.baseUrl}/students/me/pending_notifications'),
-      headers: {'Authorization': 'Bearer $_accessToken'},
+      headers: {
+        ..._ngrokBypassHeader,
+        'Authorization': 'Bearer $_accessToken',
+      },
     );
 
     if (res.statusCode == 200) {
@@ -76,7 +84,10 @@ class ApiService {
     
     final res = await http.post(
       Uri.parse('${AppConfig.baseUrl}/students/me/notifications/$notificationId/dismiss'),
-      headers: {'Authorization': 'Bearer $_accessToken'},
+      headers: {
+        ..._ngrokBypassHeader,
+        'Authorization': 'Bearer $_accessToken',
+      },
     );
 
     return res.statusCode == 200;
@@ -88,7 +99,10 @@ class ApiService {
     
     final res = await http.patch(
       Uri.parse('${AppConfig.baseUrl}/students/me/block_nfc'),
-      headers: {'Authorization': 'Bearer $_accessToken'},
+      headers: {
+        ..._ngrokBypassHeader,
+        'Authorization': 'Bearer $_accessToken',
+      },
     );
 
     return res.statusCode == 200;
@@ -99,7 +113,10 @@ class ApiService {
   static Future<bool> login(String email, String password, String expectedRole) async {
     final res = await http.post(
       Uri.parse('${AppConfig.baseUrl}/token'),
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      headers: {
+        ..._ngrokBypassHeader,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
       body: {'username': email, 'password': password},
     );
 
@@ -131,7 +148,10 @@ class ApiService {
   static Future<bool> signupStudent(String name, String email, String password) async {
     final res = await http.post(
       Uri.parse('${AppConfig.baseUrl}/students'),
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        ..._ngrokBypassHeader,
+        'Content-Type': 'application/json',
+      },
       body: jsonEncode({'name': name, 'email': email, 'password': password}),
     );
     return res.statusCode == 200 || res.statusCode == 201;
@@ -140,7 +160,10 @@ class ApiService {
   static Future<bool> signupDriver(String name, String email, String password) async {
     final res = await http.post(
       Uri.parse('${AppConfig.baseUrl}/drivers'),
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        ..._ngrokBypassHeader,
+        'Content-Type': 'application/json',
+      },
       body: jsonEncode({'name': name, 'email': email, 'password': password}),
     );
     return res.statusCode == 200 || res.statusCode == 201;
@@ -150,6 +173,7 @@ class ApiService {
     await _ensureToken();
     final token = _accessToken;
     return {
+      ..._ngrokBypassHeader,
       'Content-Type': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
     };
@@ -165,6 +189,18 @@ class ApiService {
       return List<Map<String, dynamic>>.from(data);
     }
     throw Exception('Failed to load student trips');
+  }
+
+  static Future<Map<String, dynamic>> getStudentTripDetails(String tripId) async {
+    final headers = await getAuthHeaders();
+    final res = await http.get(
+      Uri.parse('${AppConfig.baseUrl}/students/me/trips/$tripId/details'),
+      headers: headers,
+    );
+    if (res.statusCode == 200) {
+      return json.decode(res.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to load trip details');
   }
 
   static Future<bool> registerNfcCard(String nfcUid) async {
@@ -286,5 +322,165 @@ class ApiService {
       return List<Map<String, dynamic>>.from(data);
     }
     throw Exception('Failed to load trip details');
+  }
+
+  // ============ ADMIN APIs ============
+
+  static Future<Map<String, dynamic>> getAdminDashboard() async {
+    final headers = await getAuthHeaders();
+    final res = await http.get(
+      Uri.parse('${AppConfig.baseUrl}/admin/dashboard'),
+      headers: headers,
+    );
+    if (res.statusCode == 200) {
+      return json.decode(res.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to load admin dashboard');
+  }
+
+  static Future<Map<String, dynamic>> getAdminRevenue() async {
+    final headers = await getAuthHeaders();
+    final res = await http.get(
+      Uri.parse('${AppConfig.baseUrl}/admin/revenue'),
+      headers: headers,
+    );
+    if (res.statusCode == 200) {
+      return json.decode(res.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to load revenue analytics');
+  }
+
+  static Future<Map<String, dynamic>> getAdminPeakHours() async {
+    final headers = await getAuthHeaders();
+    final res = await http.get(
+      Uri.parse('${AppConfig.baseUrl}/admin/peak-hours'),
+      headers: headers,
+    );
+    if (res.statusCode == 200) {
+      return json.decode(res.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to load peak hours analytics');
+  }
+
+  static Future<Map<String, dynamic>> getAdminDriverPerformance() async {
+    final headers = await getAuthHeaders();
+    final res = await http.get(
+      Uri.parse('${AppConfig.baseUrl}/admin/drivers/performance'),
+      headers: headers,
+    );
+    if (res.statusCode == 200) {
+      return json.decode(res.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to load driver performance analytics');
+  }
+
+  static Future<Map<String, dynamic>> getAdminStudentStats() async {
+    final headers = await getAuthHeaders();
+    final res = await http.get(
+      Uri.parse('${AppConfig.baseUrl}/admin/students/stats'),
+      headers: headers,
+    );
+    if (res.statusCode == 200) {
+      return json.decode(res.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to load student analytics');
+  }
+
+  static Future<List<Map<String, dynamic>>> getBusAssignments() async {
+    final headers = await getAuthHeaders();
+    final res = await http.get(
+      Uri.parse('${AppConfig.baseUrl}/admin/bus-assignments'),
+      headers: headers,
+    );
+    if (res.statusCode == 200) {
+      final data = json.decode(res.body) as List;
+      return data.cast<Map<String, dynamic>>();
+    }
+    throw Exception('Failed to load bus assignments');
+  }
+
+  static Future<List<Map<String, dynamic>>> getAdminBuses() async {
+    final headers = await getAuthHeaders();
+    final res = await http.get(
+      Uri.parse('${AppConfig.baseUrl}/admin/buses'),
+      headers: headers,
+    );
+    if (res.statusCode == 200) {
+      final data = json.decode(res.body) as List;
+      return data.cast<Map<String, dynamic>>();
+    }
+    throw Exception('Failed to load buses');
+  }
+
+  static Future<Map<String, dynamic>> createAdminBus({
+    required String busNumber,
+    required String routeName,
+    required int capacity,
+  }) async {
+    final headers = await getAuthHeaders();
+    final res = await http.post(
+      Uri.parse('${AppConfig.baseUrl}/admin/buses'),
+      headers: headers,
+      body: jsonEncode({
+        'bus_number': busNumber,
+        'route_name': routeName,
+        'capacity': capacity,
+      }),
+    );
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      return json.decode(res.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to create bus: ${res.body}');
+  }
+
+  static Future<List<Map<String, dynamic>>> getAdminDrivers() async {
+    final headers = await getAuthHeaders();
+    final res = await http.get(
+      Uri.parse('${AppConfig.baseUrl}/admin/drivers'),
+      headers: headers,
+    );
+    if (res.statusCode == 200) {
+      final data = json.decode(res.body) as List;
+      return data.cast<Map<String, dynamic>>();
+    }
+    throw Exception('Failed to load drivers');
+  }
+
+  static Future<Map<String, dynamic>> createBusAssignment({
+    required String driverId,
+    required String busId,
+    required DateTime startTime,
+    DateTime? endTime,
+    String? notes,
+  }) async {
+    final headers = await getAuthHeaders();
+    final res = await http.post(
+      Uri.parse('${AppConfig.baseUrl}/admin/bus-assignments'),
+      headers: headers,
+      body: jsonEncode({
+        'driver_id': driverId,
+        'bus_id': busId,
+        'start_time': startTime.toUtc().toIso8601String(),
+        'end_time': endTime?.toUtc().toIso8601String(),
+        'notes': notes,
+      }),
+    );
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      return json.decode(res.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to assign bus: ${res.body}');
+  }
+
+  static Future<List<Map<String, dynamic>>> getAdminStudentTripAudit() async {
+    final headers = await getAuthHeaders();
+    final res = await http.get(
+      Uri.parse('${AppConfig.baseUrl}/admin/students/trip-audit'),
+      headers: headers,
+    );
+    if (res.statusCode == 200) {
+      final data = json.decode(res.body) as List;
+      return data.cast<Map<String, dynamic>>();
+    }
+    throw Exception('Failed to load student trip audit');
   }
 }

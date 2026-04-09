@@ -11,7 +11,7 @@ from auth import create_access_token, verify_password, get_password_hash, SECRET
 import models
 import asyncio
 from contextlib import asynccontextmanager
-from config import AUTO_EXPIRE_INTERVAL
+from config import AUTO_EXPIRE_INTERVAL, AUTO_EXPIRE_BACKGROUND_ENABLED
 from routes.admin import router as admin_router
 
 models.Base.metadata.create_all(bind=engine)
@@ -21,15 +21,18 @@ app = FastAPI(title="NFC Bus Backend")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Start background task
-    task = asyncio.create_task(background_auto_expire_task())
+    task = None
+    if AUTO_EXPIRE_BACKGROUND_ENABLED:
+        # Startup: Start periodic auto-expire task when enabled by config
+        task = asyncio.create_task(background_auto_expire_task())
     yield
-    # Shutdown: Cancel background task
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
+    # Shutdown: Cancel background task if it was started
+    if task:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 async def background_auto_expire_task():
     """Run auto-expire task in periodic intervals"""
@@ -149,9 +152,21 @@ def dismiss_expired_warning(
         raise HTTPException(status_code=404, detail="Notification not found")
     return {"detail": "Warning dismissed"}
 
-@app.get("/students/me/trips", response_model=list[schemas.Trip])
+@app.get("/students/me/trips", response_model=list[schemas.StudentTripSummary])
 def get_student_trips(db: Session = Depends(get_db), user_id: str = Depends(get_current_user_id)):
     return crud.get_student_trips(db, user_id)
+
+
+@app.get("/students/me/trips/{trip_id}/details", response_model=schemas.StudentTripDetailView)
+def get_student_trip_details(
+    trip_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    details = crud.get_student_trip_details(db, user_id, trip_id)
+    if not details:
+        raise HTTPException(status_code=404, detail="Trip details not found")
+    return details
 
 @app.delete("/students/{student_id}")
 def delete_student(student_id: str, db: Session = Depends(get_db)):

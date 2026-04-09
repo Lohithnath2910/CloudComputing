@@ -10,9 +10,12 @@ import 'student/expired_notifications_page.dart';
 import 'driver/driver_dashboard.dart';
 import 'driver/driver_profile.dart';
 import 'auth/login_page.dart';
+import 'admin/admin_dashboard_page.dart';
 import 'services/local_storage.dart';
 import 'services/fcm_service.dart';
 import 'services/notification_handler.dart';
+import 'theme/app_theme.dart';
+import 'widgets/app_widgets.dart';
 
 final FlutterLocalNotificationsPlugin _backgroundLocalNotifications =
     FlutterLocalNotificationsPlugin();
@@ -23,10 +26,10 @@ Future<void> _initializeBackgroundLocalNotifications() async {
 
   const DarwinInitializationSettings initializationSettingsIOS =
       DarwinInitializationSettings(
-    requestAlertPermission: true,
-    requestBadgePermission: true,
-    requestSoundPermission: true,
-  );
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      );
 
   const InitializationSettings initializationSettings = InitializationSettings(
     android: initializationSettingsAndroid,
@@ -45,7 +48,8 @@ Future<void> _initializeBackgroundLocalNotifications() async {
 
     await _backgroundLocalNotifications
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(channel);
   }
 }
@@ -56,7 +60,7 @@ Future<void> _initializeBackgroundLocalNotifications() async {
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Initialize Firebase if not already initialized
   await Firebase.initializeApp();
-  
+
   print('Background message received: ${message.messageId}');
   print('Message data: ${message.data}');
   print('Message notification: ${message.notification?.title}');
@@ -66,9 +70,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final data = message.data;
   final type = data['type'];
 
-  final title = message.notification?.title ??
+  final title =
+      message.notification?.title ??
       (type == 'nfc_tap' ? 'NFC Card Tapped' : 'Notification');
-  final body = message.notification?.body ??
+  final body =
+      message.notification?.body ??
       (type == 'nfc_tap'
           ? 'Please review this trip tap request.'
           : 'Open app to view details.');
@@ -93,37 +99,40 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     iOS: iosDetails,
   );
 
-  await _backgroundLocalNotifications.show(
-    DateTime.now().millisecondsSinceEpoch ~/ 1000,
-    title,
-    body,
-    platformDetails,
-    payload: jsonEncode(data),
-  );
-  
+  // Avoid duplicate notifications when FCM already renders a native notification.
+  if (message.notification == null) {
+    await _backgroundLocalNotifications.show(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title,
+      body,
+      platformDetails,
+      payload: jsonEncode(data),
+    );
+  }
+
   // Note: You can't show dialogs here, but you can:
   // 1. Show local notifications
   // 2. Update local database
   // 3. Make API calls
-  
+
   // The notification will be handled when user taps it via onMessageOpenedApp
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Firebase
   await Firebase.initializeApp();
-  
+
   // ✅ Register background message handler BEFORE initializing FCM
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  
+
   // Initialize FCM
   await FcmService.initialize();
-  
+
   // Initialize Notification Handler
   NotificationHandler.initialize();
-  
+
   runApp(const NFCBusApp());
 }
 
@@ -148,13 +157,13 @@ class _NFCBusAppState extends State<NFCBusApp> {
 
   // ✅ Check if app was opened from a notification while terminated
   Future<void> _checkForInitialMessage() async {
-    RemoteMessage? initialMessage = 
-        await FirebaseMessaging.instance.getInitialMessage();
-    
+    RemoteMessage? initialMessage = await FirebaseMessaging.instance
+        .getInitialMessage();
+
     if (initialMessage != null) {
       print('App opened from terminated state via notification');
       print('Initial message: ${initialMessage.data}');
-      
+
       // Handle the notification after app is ready
       Future.delayed(const Duration(seconds: 1), () {
         final type = initialMessage.data['type'];
@@ -206,8 +215,11 @@ class _NFCBusAppState extends State<NFCBusApp> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return MaterialApp(
-        home: Scaffold(
-          body: Center(child: CircularProgressIndicator()),
+        theme: AppTheme.light(),
+        home: const AppLoadingShell(
+          title: 'NFC Bus System',
+          subtitle: 'Restoring your session...',
+          statCount: 4,
         ),
         debugShowCheckedModeBanner: false,
       );
@@ -217,7 +229,10 @@ class _NFCBusAppState extends State<NFCBusApp> {
     late final String startName;
 
     if (_isLoggedIn) {
-      if (_role == 'driver') {
+      if (_role == 'admin') {
+        startScreen = const AdminDashboardPage();
+        startName = 'admin';
+      } else if (_role == 'driver') {
         startScreen = const DriverDashboard();
         startName = 'driver';
       } else {
@@ -234,7 +249,7 @@ class _NFCBusAppState extends State<NFCBusApp> {
     return MaterialApp(
       title: "NFC Bus System",
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
+      theme: AppTheme.light(),
       navigatorKey: NotificationHandler.navigatorKey,
       home: startScreen,
       routes: {
@@ -244,6 +259,10 @@ class _NFCBusAppState extends State<NFCBusApp> {
         '/expired_notifications': (_) => const ExpiredNotificationsPage(),
         '/driver': (_) => const DriverDashboard(),
         '/driver_profile': (_) => const DriverProfile(),
+        '/admin': (_) => const AdminDashboardPage(),
+        '/admin/revenue': (_) => const RevenueAnalyticsPage(),
+        '/admin/drivers': (_) => const DriverStatsPage(),
+        '/admin/students': (_) => const StudentStatsPage(),
       },
     );
   }

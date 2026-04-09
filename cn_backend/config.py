@@ -8,6 +8,7 @@ BASE_FARE = float(os.getenv("BASE_FARE", "20.0"))
 
 # Notification Configuration
 AUTO_EXPIRE_INTERVAL = int(os.getenv("AUTO_EXPIRE_INTERVAL", "30"))  # seconds
+AUTO_EXPIRE_BACKGROUND_ENABLED = os.getenv("AUTO_EXPIRE_BACKGROUND_ENABLED", "false").lower() == "true"
 
 # Tap Notification Configuration
 TAP_NOTIFICATION_EXPIRY_DURATION = int(os.getenv("TAP_NOTIFICATION_EXPIRY_DURATION", "300"))  # 5 minutes
@@ -17,3 +18,6 @@ ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://loc
 
 # Debug Mode
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+
+# Database logging
+DB_ECHO = os.getenv("DB_ECHO", "false").lower() == "true"

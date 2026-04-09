@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'dart:async';
+import '../theme/app_theme.dart';
 
 class TapNotificationDialog extends StatefulWidget {
   final String notificationId;
@@ -18,9 +19,9 @@ class TapNotificationDialog extends StatefulWidget {
 
 class _TapNotificationDialogState extends State<TapNotificationDialog> {
   // TIMEOUT: 2 minutes - EASILY CHANGEABLE HERE
-  static const int TIMEOUT_SECONDS = 120; // 2 minutes
-  
-  int remainingSeconds = TIMEOUT_SECONDS;
+  static const int timeoutSeconds = 120; // 2 minutes
+
+  int remainingSeconds = timeoutSeconds;
   Timer? _timer;
   bool _responding = false;
 
@@ -44,28 +45,29 @@ class _TapNotificationDialogState extends State<TapNotificationDialog> {
   }
 
   void _autoExpire() async {
-  if (!_responding && mounted) {
-    // ✅ FIXED: Call backend to mark as expired
-    try {
-      await ApiService.respondToTapNotification(widget.notificationId, true);
-    } catch (e) {
-      debugPrint('Error auto-expiring notification: $e');
-    }
-    
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('⚠️ Notification expired - Payment auto-accepted'),
-        backgroundColor: Colors.orange,
-      ),
-    );
-  }
-}
+    if (!_responding && mounted) {
+      // ✅ FIXED: Call backend to mark as expired
+      try {
+        await ApiService.respondToTapNotification(widget.notificationId, true);
+      } catch (e) {
+        debugPrint('Error auto-expiring notification: $e');
+      }
 
+      if (!mounted) return;
+
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Notification expired - Payment auto-accepted'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+  }
 
   Future<void> _respond(bool accepted) async {
     if (_responding) return;
-    
+
     setState(() {
       _responding = true;
     });
@@ -73,15 +75,20 @@ class _TapNotificationDialogState extends State<TapNotificationDialog> {
     _timer?.cancel();
 
     try {
-      await ApiService.respondToTapNotification(widget.notificationId, accepted);
-      
+      await ApiService.respondToTapNotification(
+        widget.notificationId,
+        accepted,
+      );
+
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(accepted 
-              ? '✅ Payment accepted successfully' 
-              : '❌ Payment denied - marked as misused'),
+            content: Text(
+              accepted
+                  ? '✅ Payment accepted successfully'
+                  : '❌ Payment denied - marked as misused',
+            ),
             backgroundColor: accepted ? Colors.green : Colors.red,
           ),
         );
@@ -110,6 +117,7 @@ class _TapNotificationDialogState extends State<TapNotificationDialog> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        scrollable: true,
         title: const Text('Block Your NFC?'),
         content: const Text(
           'Was this payment attempt fraudulent? '
@@ -145,45 +153,53 @@ class _TapNotificationDialogState extends State<TapNotificationDialog> {
     final seconds = remainingSeconds % 60;
 
     return AlertDialog(
+      backgroundColor: AppColors.surface,
+      scrollable: true,
       title: const Row(
         children: [
-          Icon(Icons.nfc, color: Colors.blue, size: 28),
+          Icon(Icons.nfc_rounded, color: AppColors.accent, size: 28),
           SizedBox(width: 12),
           Expanded(child: Text('NFC Card Tapped')),
         ],
       ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Your NFC card was just scanned on a bus.',
-            style: TextStyle(fontSize: 16),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'NFC ID: ${widget.nfcId}',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Time remaining: $minutes:${seconds.toString().padLeft(2, '0')}',
-            style: TextStyle(
-              color: remainingSeconds < 30 ? Colors.red : Colors.orange,
-              fontWeight: FontWeight.bold,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Your NFC card was just scanned on a bus.',
+              style: TextStyle(fontSize: 16),
             ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Was this you? Accept to pay for this trip, or deny if this is fraudulent.',
-            style: TextStyle(fontSize: 14, color: Colors.grey),
-          ),
-        ],
+            const SizedBox(height: 12),
+            Text(
+              'NFC ID: ${widget.nfcId}',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Time remaining: $minutes:${seconds.toString().padLeft(2, '0')}',
+              style: TextStyle(
+                color: remainingSeconds < 30
+                    ? AppColors.danger
+                    : AppColors.warning,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Was this you? Accept to pay for this trip, or deny if this is fraudulent.',
+              style: TextStyle(fontSize: 14, color: AppColors.mutedText),
+            ),
+          ],
+        ),
       ),
+      actionsOverflowAlignment: OverflowBarAlignment.end,
       actions: [
         TextButton(
           onPressed: _responding ? null : () => _respond(false),
-          style: TextButton.styleFrom(foregroundColor: Colors.red),
+          style: TextButton.styleFrom(foregroundColor: AppColors.danger),
           child: _responding
               ? const SizedBox(
                   width: 20,
@@ -194,7 +210,7 @@ class _TapNotificationDialogState extends State<TapNotificationDialog> {
         ),
         ElevatedButton(
           onPressed: _responding ? null : () => _respond(true),
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
           child: _responding
               ? const SizedBox(
                   width: 20,
