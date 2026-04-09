@@ -4,6 +4,9 @@ from sqlalchemy.orm import Session
 import models
 
 
+IST_TZ = "Asia/Kolkata"
+
+
 def get_dashboard_totals(db: Session):
     total_students = db.query(func.count(models.Student.id)).scalar() or 0
     total_drivers = db.query(func.count(models.BusDriver.id)).scalar() or 0
@@ -28,9 +31,10 @@ def get_dashboard_totals(db: Session):
 
 
 def get_revenue_time_series(db: Session):
+    local_created_at = func.timezone(IST_TZ, models.Trip.created_at)
     rows = (
         db.query(
-            func.date_trunc("day", models.Trip.created_at).label("bucket"),
+            func.date_trunc("day", local_created_at).label("bucket"),
             func.coalesce(func.sum(models.Trip.total_revenue), 0.0).label("value"),
         )
         .group_by("bucket")
@@ -71,9 +75,10 @@ def get_revenue_per_bus(db: Session):
 
 
 def get_peak_hours(db: Session):
+    local_timestamp = func.timezone(IST_TZ, models.TripDetail.timestamp)
     rows = (
         db.query(
-            func.extract("hour", models.TripDetail.timestamp).label("hour"),
+            func.extract("hour", local_timestamp).label("hour"),
             func.count(models.TripDetail.id).label("taps"),
         )
         .group_by("hour")

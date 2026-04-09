@@ -211,7 +211,7 @@ def delete_driver(driver_id: str, db: Session = Depends(get_db)):
 # ---------------- Driver Active Trip Management ----------------
 @app.post("/drivers/me/trips/active", response_model=schemas.Trip)
 def create_and_start_active_trip(
-    body: dict, 
+    body: schemas.ActiveTripCreateRequest,
     db: Session = Depends(get_db), 
     user_id: str = Depends(get_current_user_id)
 ):
@@ -223,8 +223,18 @@ def create_and_start_active_trip(
     if active_trip:
         raise HTTPException(status_code=400, detail="You already have an active trip. Please end it first.")
     
-    trip_name = body.get("name", "Trip")
-    trip_data = schemas.TripCreate(driver_id=user_id, name=trip_name)
+    trip_name = body.name or "Trip"
+
+    try:
+        resolved_bus_id = crud.resolve_bus_for_new_active_trip(
+            db,
+            user_id,
+            str(body.bus_id) if body.bus_id else None,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    trip_data = schemas.TripCreate(driver_id=user_id, name=trip_name, bus_id=resolved_bus_id)
     trip = crud.create_trip(db, trip_data)
     trip = crud.start_trip(db, str(trip.id))
     return trip

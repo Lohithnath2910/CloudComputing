@@ -1,10 +1,28 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import and_, or_, func
 import models
-from schemas import StudentCreate, BusDriverCreate, TripCreate, TripDetailCreate, AdminCreate, BusCreate
+from schemas import (
+    StudentCreate,
+    BusDriverCreate,
+    TripCreate,
+    TripDetailCreate,
+    AdminCreate,
+    BusCreate,
+    DriverBusAssignmentCreate,
+)
 from datetime import datetime, timedelta
 from config import BASE_FARE, TAP_NOTIFICATION_EXPIRY_DURATION
 from auth import get_password_hash, verify_password
 import fcm_service
+
+
+def _overlap_filter(start_time, end_time):
+    far_future = datetime(9999, 12, 31)
+    comparison_end = end_time or far_future
+    return and_(
+        models.DriverBusAssignment.start_time < comparison_end,
+        func.coalesce(models.DriverBusAssignment.end_time, far_future) > start_time,
+    )
 
 # ------------------- Students -------------------
 def create_student(db: Session, student: StudentCreate):
@@ -153,6 +171,131 @@ def get_bus_by_id(db: Session, bus_id: str):
 
 def list_buses(db: Session):
     return db.query(models.Bus).order_by(models.Bus.bus_number.asc()).all()
+
+
+def get_active_assignment_for_driver(db: Session, driver_id: str, at_time: datetime | None = None):
+    now = at_time or datetime.utcnow()
+    return (
+        db.query(models.DriverBusAssignment)
+        .filter(
+            models.DriverBusAssignment.driver_id == driver_id,
+            models.DriverBusAssignment.start_time <= now,
+            or_(models.DriverBusAssignment.end_time.is_(None), models.DriverBusAssignment.end_time > now),
+        )
+        .order_by(models.DriverBusAssignment.start_time.desc())
+        .first()
+    )
+
+
+def get_active_assignment_for_bus(db: Session, bus_id: str, at_time: datetime | None = None):
+    now = at_time or datetime.utcnow()
+    return (
+        db.query(models.DriverBusAssignment)
+        .filter(
+            models.DriverBusAssignment.bus_id == bus_id,
+            models.DriverBusAssignment.start_time <= now,
+            or_(models.DriverBusAssignment.end_time.is_(None), models.DriverBusAssignment.end_time > now),
+        )
+        .order_by(models.DriverBusAssignment.start_time.desc())
+        .first()
+    )
+
+
+def list_assignments(db: Session):
+    return (
+        db.query(models.DriverBusAssignment)
+        .order_by(models.DriverBusAssignment.start_time.desc())
+        .all()
+    )
+
+
+def create_driver_bus_assignment(
+    db: Session,
+    payload: DriverBusAssignmentCreate,
+    assigned_by_admin_id: str | None = None,
+):
+    if payload.end_time is not None and payload.end_time <= payload.start_time:
+        raise ValueError("end_time must be after start_time")
+
+    driver = get_driver_by_id(db, str(payload.driver_id))
+    if not driver:
+        raise ValueError("Driver not found")
+
+    bus = get_bus_by_id(db, str(payload.bus_id))
+    if not bus or not bus.is_active:
+        raise ValueError("Bus not found or inactive")
+
+    driver_overlap = (
+        db.query(models.DriverBusAssignment)
+        .filter(
+            models.DriverBusAssignment.driver_id == payload.driver_id,
+            _overlap_filter(payload.start_time, payload.end_time),
+        )
+        .first()
+    )
+    if driver_overlap:
+        raise ValueError("Driver already assigned during this timeslot")
+
+    bus_overlap = (
+        db.query(models.DriverBusAssignment)
+        .filter(
+            models.DriverBusAssignment.bus_id == payload.bus_id,
+            _overlap_filter(payload.start_time, payload.end_time),
+        )
+        .first()
+    )
+    if bus_overlap:
+        raise ValueError("Bus already assigned to another driver during this timeslot")
+
+    assignment = models.DriverBusAssignment(
+        driver_id=payload.driver_id,
+        bus_id=payload.bus_id,
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+        assigned_by_admin_id=assigned_by_admin_id,
+        notes=payload.notes,
+    )
+    db.add(assignment)
+    db.commit()
+    db.refresh(assignment)
+    return assignment
+
+
+def resolve_bus_for_new_active_trip(db: Session, driver_id: str, requested_bus_id: str | None):
+    now = datetime.utcnow()
+    active_assignment = get_active_assignment_for_driver(db, driver_id, now)
+    final_bus_id = requested_bus_id
+
+    if final_bus_id is None and active_assignment:
+        final_bus_id = str(active_assignment.bus_id)
+
+    if final_bus_id is None:
+        return None
+
+    bus = get_bus_by_id(db, final_bus_id)
+    if not bus or not bus.is_active:
+        raise ValueError("Selected bus not found or inactive")
+
+    if active_assignment and str(active_assignment.bus_id) != final_bus_id:
+        raise ValueError("Driver is assigned to another bus in current timeslot")
+
+    active_bus_assignment = get_active_assignment_for_bus(db, final_bus_id, now)
+    if active_bus_assignment and str(active_bus_assignment.driver_id) != driver_id:
+        raise ValueError("Bus is assigned to another driver in current timeslot")
+
+    active_trip_on_bus = (
+        db.query(models.Trip)
+        .filter(
+            models.Trip.bus_id == final_bus_id,
+            models.Trip.start_time.isnot(None),
+            models.Trip.end_time.is_(None),
+        )
+        .first()
+    )
+    if active_trip_on_bus:
+        raise ValueError("Bus already has an active trip")
+
+    return final_bus_id
 
 # ------------------- Bus Drivers -------------------
 def create_driver(db: Session, driver: BusDriverCreate):

@@ -57,6 +57,23 @@ def create_bus(bus: schemas.BusCreate, db: Session = Depends(get_db), _: str = D
     return crud.create_bus(db, bus)
 
 
+@router.get("/bus-assignments", response_model=list[schemas.DriverBusAssignment])
+def list_bus_assignments(db: Session = Depends(get_db), _: str = Depends(get_current_admin_id)):
+    return crud.list_assignments(db)
+
+
+@router.post("/bus-assignments", response_model=schemas.DriverBusAssignment)
+def create_bus_assignment(
+    payload: schemas.DriverBusAssignmentCreate,
+    db: Session = Depends(get_db),
+    admin_id: str = Depends(get_current_admin_id),
+):
+    try:
+        return crud.create_driver_bus_assignment(db, payload, admin_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.get("/dashboard", response_model=schemas.DashboardSummary)
 def dashboard(db: Session = Depends(get_db), _: str = Depends(get_current_admin_id)):
     return analytics_service.get_dashboard(db)

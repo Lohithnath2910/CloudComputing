@@ -72,6 +72,32 @@ class Bus(BusBase):
     class Config:
         from_attributes = True
 
+
+class DriverBusAssignmentBase(BaseModel):
+    driver_id: UUID
+    bus_id: UUID
+    start_time: datetime
+    end_time: Optional[datetime] = None
+    notes: Optional[str] = None
+
+
+class DriverBusAssignmentCreate(DriverBusAssignmentBase):
+    pass
+
+
+class DriverBusAssignment(DriverBusAssignmentBase):
+    id: UUID
+    assigned_by_admin_id: Optional[UUID] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ActiveTripCreateRequest(BaseModel):
+    name: Optional[str] = "Trip"
+    bus_id: Optional[UUID] = None
+
 class TripBase(BaseModel):
     driver_id: UUID
     name: Optional[str] = "Trip"

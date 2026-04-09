@@ -16,6 +16,8 @@ class Admin(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    assignments = relationship("DriverBusAssignment", back_populates="assigned_by_admin")
+
 
 class Bus(Base):
     __tablename__ = "buses"
@@ -28,6 +30,7 @@ class Bus(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     trips = relationship("Trip", back_populates="bus")
+    assignments = relationship("DriverBusAssignment", back_populates="bus")
 
 class Student(Base):
     __tablename__ = "students"
@@ -53,6 +56,31 @@ class BusDriver(Base):
     fcm_token = Column(String, nullable=True)
     
     trips = relationship("Trip", back_populates="driver")
+    assignments = relationship("DriverBusAssignment", back_populates="driver")
+
+
+class DriverBusAssignment(Base):
+    __tablename__ = "driver_bus_assignments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    driver_id = Column(UUID(as_uuid=True), ForeignKey("bus_drivers.id"), nullable=False)
+    bus_id = Column(UUID(as_uuid=True), ForeignKey("buses.id"), nullable=False)
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=True)
+    assigned_by_admin_id = Column(UUID(as_uuid=True), ForeignKey("admins.id"), nullable=True)
+    notes = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    driver = relationship("BusDriver", back_populates="assignments")
+    bus = relationship("Bus", back_populates="assignments")
+    assigned_by_admin = relationship("Admin", back_populates="assignments")
+
+    __table_args__ = (
+        Index("ix_driver_bus_assignments_driver_id", "driver_id"),
+        Index("ix_driver_bus_assignments_bus_id", "bus_id"),
+        Index("ix_driver_bus_assignments_start_time", "start_time"),
+        Index("ix_driver_bus_assignments_end_time", "end_time"),
+    )
 
 class Trip(Base):
     __tablename__ = "trips"
